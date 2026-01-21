@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Check-in Seminario</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f2f2f2;
+      padding: 20px;
+    }
+    .card {
+      background: #fff;
+      padding: 20px;
+      border-radius: 10px;
+      max-width: 420px;
+      margin: auto;
+      box-shadow: 0 2px 10px rgba(0,0,0,.2);
+    }
+    h2 { margin-top: 0; }
+    .ok { color: green; }
+    .error { color: red; }
+    pre {
+      background: #f7f7f7;
+      padding: 10px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+
+<div class="card" id="app">
+  <h2>Validando acceso...</h2>
+</div>
+
+<script>
+const API_URL = "https://script.google.com/macros/s/AKfycbylZlcVqygsAn8HdGnxjEZYIUOPxmIHaaYYt-jf_zSbD0lAMFbDSNnDF47J4miADU2B0g/exec";
+
+const params = new URLSearchParams(window.location.search);
+const code = params.get("code");
+
+/* ===============================
+   PROTECCIÓN CONTRA DOBLE SCAN
+   =============================== */
+if (code && sessionStorage.getItem("checkin_" + code)) {
+  document.getElementById("app").innerHTML =
+    "<p class='error'>Este QR ya fue procesado en este dispositivo.</p>";
+  throw new Error("QR ya procesado");
+}
+
+if (!code) {
+  document.getElementById("app").innerHTML =
+    "<p class='error'>QR inválido</p>";
+} else {
+
+  sessionStorage.setItem("checkin_" + code, "1");
+
+  fetch(`${API_URL}?api=1&code=${code}`)
+    .then(r => r.json())
+    .then(res => {
+      if (!res.ok) {
+        document.getElementById("app").innerHTML =
+          `<p class='error'>${res.mensaje}</p>`;
+        return;
+      }
+
+      const d = res.data;
+
+      const texto = `
+ACCESO AUTORIZADO
+
+Nombre: ${d.nombre}
+Pastor: ${d.pastor}
+WhatsApp: ${d.whatsapp || "-"}
+Tipo de pago: ${d.tipoPago}
+Usos restantes hoy: ${d.usosRestantes}
+
+Integrantes:
+${d.integrantes || "No aplica"}
+      `.trim();
+
+      document.getElementById("app").innerHTML = `
+        <h2 class="ok">${res.mensaje}</h2>
+        <pre>${texto}</pre>
+      `;
+
+      /* ===============================
+         DESCARGA AUTOMÁTICA TXT
+         =============================== */
+      const nombreArchivo = `acceso-${d.nombre.replace(/\s+/g, "_")}.txt`;
+
+      const blob = new Blob([texto], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombreArchivo;
+      a.click();
+      URL.revokeObjectURL(url);
+    })
+    .catch(() => {
+      document.getElementById("app").innerHTML =
+        "<p class='error'>Error de conexión</p>";
+    });
+}
+</script>
+
+</body>
+</html>
