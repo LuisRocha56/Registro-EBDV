@@ -23,37 +23,60 @@ button {
 
 <script>
 const API_URL = "https://script.google.com/macros/s/AKfycbwagu6s4ikyTdI3ZBlkpIYGNjB4u70wDKUvFzpcOT8We7paW4SyfG38MOKi8zn6XB8M8Q/exec";
-const code = new URLSearchParams(location.search).get("code");
+const params = new URLSearchParams(window.location.search);
+const code = params.get("code");
 
-fetch(`${API_URL}?api=1&code=${code}`)
-.then(r=>r.json())
-.then(res=>{
-  if(!res.ok){
-    app.innerHTML=`<p class="error">${res.mensaje}</p>`;
-    return;
-  }
+if (!code) {
+  document.getElementById("app").innerHTML =
+    "<p class='error'>QR inválido</p>";
+} else {
 
-  const d = res.data;
-  const texto = `
-ACCESO AUTORIZADO
-Nombre: ${d.nombre}
-Tipo: ${d.tipoPago}
-Usos restantes hoy: ${d.usosRestantes}
-`;
+  fetch(`${API_URL}?api=1&code=${code}`)
+    .then(r => r.json())
+    .then(res => {
 
-  app.innerHTML = `
-    <h2 class="ok">${res.mensaje}</h2>
-    <pre id="txt">${texto}</pre>
-    <button onclick="descargar()">Descargar comprobante</button>
-  `;
-});
+      if (!res.ok) {
+        document.getElementById("app").innerHTML =
+          `<p class='error'>${res.mensaje}</p>`;
+        return;
+      }
 
-function descargar(){
-  const t=document.getElementById("txt").innerText;
-  const a=document.createElement("a");
-  a.href=URL.createObjectURL(new Blob([t],{type:"text/plain"}));
-  a.download="comprobante.txt";
+      const d = res.data;
+
+      const texto = `
+        ACCESO AUTORIZADO
+
+        Nombre: ${d.nombre}
+        Pastor: ${d.pastor || "-"}
+        WhatsApp: ${d.whatsapp || "-"}
+        Tipo de pago: ${d.tipoPago}
+        Usos restantes hoy: ${d.usosRestantes}
+
+        Integrantes:
+        ${d.integrantes || "No aplica"}
+      `.trim();
+
+      document.getElementById("app").innerHTML = `
+        <h2 class="ok">${res.mensaje}</h2>
+        <pre id="comprobante">${texto}</pre>
+        <button onclick="descargar()">Descargar comprobante</button>
+      `;
+    })
+    .catch(() => {
+      document.getElementById("app").innerHTML =
+        "<p class='error'>Error de conexión</p>";
+    });
+}
+
+function descargar() {
+  const texto = document.getElementById("comprobante").innerText;
+  const blob = new Blob([texto], { type: "text/plain;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "comprobante-acceso.txt";
   a.click();
+  URL.revokeObjectURL(url);
 }
 </script>
 
